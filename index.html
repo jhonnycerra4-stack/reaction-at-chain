@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>L'Intesa Vincente - Simulatore</title>
+    <style>
+        /* --- STILE VISIVO --- */
+        body {
+            font-family: 'Arial', sans-serif;
+            background: radial-gradient(circle, #005c97 0%, #002b49 100%);
+            color: white;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            text-align: center;
+        }
+
+        #game-container {
+            width: 90%;
+            max-width: 800px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid #00a8ff;
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 0 30px rgba(0, 168, 255, 0.4);
+        }
+
+        /* Schermata di Setup */
+        .setup-screen input {
+            padding: 15px;
+            font-size: 1.5rem;
+            border-radius: 10px;
+            border: none;
+            width: 100px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        /* Elementi del Gioco */
+        .hidden { display: none; }
+
+        .header-bar {
+            display: flex;
+            justify-content: space-between;
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 40px;
+            text-shadow: 0 0 10px #000;
+        }
+
+        .timer-box { color: #ffcc00; }
+        .score-box { color: #fff; }
+
+        .word-display {
+            font-size: 4rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            margin: 40px 0;
+            min-height: 100px;
+            text-shadow: 2px 2px 0px #003366;
+            background: linear-gradient(to bottom, #ffffff 0%, #b3d9ff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 5px rgba(255,255,255,0.5));
+        }
+
+        /* Pulsanti */
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        button {
+            padding: 20px;
+            font-size: 1.5rem;
+            border: none;
+            border-radius: 15px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.1s, filter 0.2s;
+            text-transform: uppercase;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+        }
+
+        button:active { transform: scale(0.95); }
+
+        .btn-start {
+            background: linear-gradient(to bottom, #00d2ff 0%, #3a7bd5 100%);
+            color: white;
+            width: 100%;
+        }
+
+        .btn-pass {
+            background: linear-gradient(to bottom, #ff416c 0%, #ff4b2b 100%);
+            color: white;
+        }
+
+        .btn-correct {
+            background: linear-gradient(to bottom, #56ab2f 0%, #a8e063 100%);
+            color: #003300;
+        }
+
+        /* Schermata Finale */
+        .final-score {
+            font-size: 5rem;
+            color: #ffcc00;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        
+        <div id="setup-view" class="setup-screen">
+            <h1>L'Intesa Vincente</h1>
+            <p>Scegli la durata del turno:</p>
+            <input type="number" id="minutes-input" value="1" min="1" max="10"> <span style="font-size: 1.5rem;">Minuti</span>
+            <br><br>
+            <button class="btn-start" onclick="startGame()">INIZIA IL GIOCO</button>
+        </div>
+
+        <div id="game-view" class="hidden">
+            <div class="header-bar">
+                <div class="timer-box">⏱️ <span id="timer">00:00</span></div>
+                <div class="score-box">MONTEPREMI: <span id="score">0</span></div>
+            </div>
+
+            <div class="word-display" id="current-word">PRONTI?</div>
+
+            <div class="controls">
+                <button class="btn-pass" onclick="handlePass()">PASSO (Spazio)</button>
+                <button class="btn-correct" onclick="handleCorrect()">GIUSTO (Invio)</button>
+            </div>
+        </div>
+
+        <div id="result-view" class="hidden">
+            <h1>TEMPO SCADUTO!</h1>
+            <p>Parole indovinate:</p>
+            <div class="final-score" id="final-score-display">0</div>
+            <button class="btn-start" onclick="resetGame()">GIOCA ANCORA</button>
+        </div>
+
+    </div>
+
+    <script>
+        // --- CONFIGURAZIONE E VARIABILI ---
+        // Puoi aggiungere parole a questa lista!
+        const wordList = [
+            "Casa", "Albero", "Computer", "Pizza", "Mare", "Montagna", "Libro", "Viaggio",
+            "Musica", "Telefono", "Cane", "Gatto", "Sole", "Luna", "Stella", "Amico",
+            "Amore", "Calcio", "Scuola", "Lavoro", "Film", "Attore", "Cantante", "Auto",
+            "Treno", "Aereo", "Orologio", "Specchio", "Tavolo", "Sedia", "Finestra",
+            "Porta", "Chiave", "Borsa", "Scarpe", "Vestito", "Occhiali", "Bicchiere",
+            "Piatto", "Forchetta", "Coltello", "Cucchiaio", "Padella", "Frigo", "Forno",
+            "Radio", "Televisione", "Divano", "Letto", "Cuscino", "Coperta", "Doccia"
+        ];
+
+        let shuffledWords = [];
+        let currentIndex = 0;
+        let score = 0;
+        let timeLeft = 0;
+        let timerInterval;
+
+        // --- FUNZIONI DI GIOCO ---
+
+        function startGame() {
+            const minutes = document.getElementById('minutes-input').value;
+            timeLeft = minutes * 60;
+            score = 0;
+            
+            // Mischia le parole
+            shuffledWords = [...wordList].sort(() => 0.5 - Math.random());
+            currentIndex = 0;
+
+            // Aggiorna UI
+            document.getElementById('score').innerText = score;
+            document.getElementById('setup-view').classList.add('hidden');
+            document.getElementById('result-view').classList.add('hidden');
+            document.getElementById('game-view').classList.remove('hidden');
+
+            nextWord();
+            startTimer();
+        }
+
+        function startTimer() {
+            updateTimerDisplay();
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerDisplay();
+
+                if (timeLeft <= 0) {
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            const m = Math.floor(timeLeft / 60);
+            const s = timeLeft % 60;
+            document.getElementById('timer').innerText = 
+                `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            
+            // Effetto rosso quando manca poco
+            if (timeLeft <= 10) {
+                document.getElementById('timer').style.color = '#ff416c';
+            } else {
+                document.getElementById('timer').style.color = '#ffcc00';
+            }
+        }
+
+        function nextWord() {
+            if (currentIndex < shuffledWords.length) {
+                document.getElementById('current-word').innerText = shuffledWords[currentIndex];
+                currentIndex++;
+            } else {
+                // Se finiscono le parole, rimischia
+                shuffledWords = [...wordList].sort(() => 0.5 - Math.random());
+                currentIndex = 0;
+                nextWord();
+            }
+        }
+
+        function handleCorrect() {
+            score++;
+            document.getElementById('score').innerText = score;
+            
+            // Piccola animazione
+            const wordEl = document.getElementById('current-word');
+            wordEl.style.transform = "scale(1.2)";
+            setTimeout(() => wordEl.style.transform = "scale(1)", 100);
+
+            nextWord();
+        }
+
+        function handlePass() {
+            // Nel gioco originale a volte si perde un punto o non succede nulla.
+            // Qui passiamo semplicemente alla prossima senza punti.
+            nextWord();
+        }
+
+        function endGame() {
+            clearInterval(timerInterval);
+            document.getElementById('game-view').classList.add('hidden');
+            document.getElementById('result-view').classList.remove('hidden');
+            document.getElementById('final-score-display').innerText = score;
+        }
+
+        function resetGame() {
+            document.getElementById('result-view').classList.add('hidden');
+            document.getElementById('setup-view').classList.remove('hidden');
+        }
+
+        // --- CONTROLLI TASTIERA ---
+        document.addEventListener('keydown', (e) => {
+            if (document.getElementById('game-view').classList.contains('hidden')) return;
+
+            if (e.code === 'Enter') {
+                handleCorrect();
+            } else if (e.code === 'Space') {
+                e.preventDefault(); // Evita scroll della pagina
+                handlePass();
+            }
+        });
+    </script>
+</body>
+</html>
